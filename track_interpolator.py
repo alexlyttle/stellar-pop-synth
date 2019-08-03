@@ -51,7 +51,7 @@ def interpolate(feh, mass, col, tracks, n_feh=100, n_mass=400, n_age=400,
     x = np.ndarray((0, n_dim))
     Y = np.ndarray((0, n_col))
 
-    for i in tqdm(range(len(tracks)):
+    for i in tqdm(range(len(tracks))):
         # For each metallicity
         for j, tr in enumerate(tracks[i]):
             # For each mass
@@ -78,6 +78,9 @@ def interpolate(feh, mass, col, tracks, n_feh=100, n_mass=400, n_age=400,
         
 if __name__ == "__main__":
     
+    # To test the interpolator, use a reduced grid of tracks and then plot an 
+    # interpolated track against a MESA generated track - qunatify the
+    # difference with a metric of some kind (e.g. diff in lum with mass)
     rc = pickle.load(open('test-data/rc_grid.pkl', 'rb'))
     params = pickle.load(open('test-data/grid_params.pkl', 'rb'))
     feh = params['Fe_H']
@@ -95,5 +98,6 @@ if __name__ == "__main__":
     interp = interpolate(feh, mass, col, tracks)
     # Structure of interp is [mass, feh, age, columns] for some reason
     plt.figure()
-    plt.loglog(interp[0, 0, :, 0], interp[0, 0, :, 1])
+    for i in range(20):
+        plt.loglog(interp[20*i, 0, :, 0], interp[20*i, 0, :, 1], alpha=0.3)
     plt.gca().invert_xaxis()

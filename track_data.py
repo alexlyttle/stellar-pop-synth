@@ -56,6 +56,14 @@ class MesaData:
                 'header:\n{}'.format(self.header)
                 )
     
+    def __getattr__(self, attr):
+        if attr in self.data.columns:
+            return self.data[attr]
+        elif attr in self.header:  # THIS IS NOT IDEAL: REVISE
+            return self.header[attr]
+        else:
+            raise AttributeError(attr)
+
     def read_data(self):
         """Loads or updates track data into a series of pandas DataFrame 
         objects.
@@ -63,8 +71,10 @@ class MesaData:
         This reads the data from the file name provided. Lots of error checks
         needed here!
         """
+        # This is quite ugly but works for now.
         self.header = read_csv(self.file_name, delim_whitespace=True,
-                               header=TrackData.header_line, nrows=1)
+                               header=TrackData.header_line,
+                               nrows=1).to_dict(orient='index')[0]
         self.data = read_csv(self.file_name, delim_whitespace=True, 
                              header=TrackData.data_line)
 
@@ -86,13 +96,13 @@ class TrackData(MesaData):
         The initial metallicity of the stellar track
     """
 
-    def __init__(self, file_name='LOGS/history.data', read_file=True,
-                 data=None, header=None, initial_mass=None, initial_z=None):
+    # def __init__(self, file_name='LOGS/history.data', read_file=True,
+    #              data=None, header=None, initial_mass=None, initial_z=None):
 
-        MesaData.__init__(self, file_name=file_name, read_file=read_file,
-                          data=data, header=header)
-        self.set_initial_conditions(initial_mass=initial_mass,
-                                      initial_z=initial_z)
+    #     MesaData.__init__(self, file_name=file_name, read_file=read_file,
+    #                       data=data, header=header)
+    #     self.set_initial_conditions(initial_mass=initial_mass,
+    #                                 initial_z=initial_z)
 
     def __repr__(self):
         return ('TrackData(file_name={0}, data={1}, header={2}, '.format(
@@ -109,21 +119,23 @@ class TrackData(MesaData):
                 'initial_z:\n{}'.format(self.initial_z)
                 )
     
-    def set_initial_conditions(self, initial_mass=None, initial_z=None):
-        """Sets initial conditions of the stellar track to what is
-        provided in the header data (default) unless
-        provided explicitly in the keyword arguements.
+    # def set_initial_conditions(self, initial_mass=None, initial_z=None):
+    #     """Sets initial conditions of the stellar track to what is
+    #     provided in the header data (default) unless
+    #     provided explicitly in the keyword arguements.
 
-        Attributes
-        ----------
-        initial_mass : float, optional
-            Initial mass of the evolutionary track.
-        initial_z : float, optional    
-            Initial metallicity of the evolutionary track.
-        """
-        self.initial_mass = initial_mass if initial_mass else \
-            self.header.initial_mass[0]
-        self.initial_z = initial_z if initial_z else self.header.initial_z[0]
+    #     Attributes
+    #     ----------
+    #     initial_mass : float, optional
+    #         Initial mass of the evolutionary track if not available in
+    #         TrackData.header.
+    #     initial_z : float, optional    
+    #         Initial metallicity of the evolutionary track if not available in
+    #         TrackData.header.
+    #     """
+    #     self.initial_mass = initial_mass if initial_mass else \
+    #         self.header.initial_mass[0]
+    #     self.initial_z = initial_z if initial_z else self.header.initial_z[0]
 
     def crop_rc(self, center_he4_upper=0.95, center_he4_lower=1e-4,
                 center_c12_lower=0.05):
@@ -168,10 +180,36 @@ class TrackData(MesaData):
 
 
 class ProfileData(MesaData):
-    """Structure containing DataFrames from a MESA profile output file. TBC.
+    """Structure containing DataFrames from a MESA profile output file. TBC...
+    """
+    def __repr__(self):
+        return 'ProfileData(file_name={0}, data={1}, header={2})'.format(
+            self.file_name, self.data, self.header)
+
+    def __str__(self):
+        return ('A member of ProfileData with attributes,\n\n' +
+                'file_name:\n"{}"\n\n'.format(self.file_name) +
+                'data:\n{}\n\n'.format(self.data) +
+                'header:\n{}'.format(self.header)
+                )
+
+
+
+class MesaLogs:
+    """Reads the MESA LOGS directory and creates instances of TrackData and 
+    ProfileData where appropriate.
     """
 
+    def __init__(self, logs_path='LOGS'):
+        self.logs_path = logs_path
 
-if __name__ == '__main__':
-    track = TrackData(file_name='test-data/m1.40.track')
-    print(track)
+
+class MesaGrid:
+    """Creates a grid of track data from a given directory path or specified
+    list of file paths. Methods to access tracks with a given initial condition
+    MesaGrid.search_grid() and sort the grid by mass/metallicity etc. will
+    be added.
+    """
+
+    def __init__(self, grid_path=None):
+        self.grid_path = grid_path
