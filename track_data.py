@@ -2,6 +2,8 @@
 # Date:     27-07-2019
 
 from pandas import DataFrame, read_csv
+from matplotlib import pyplot as plt
+from matplotlib.ticker import ScalarFormatter
 
 
 class MesaData:
@@ -43,7 +45,7 @@ class MesaData:
         self.data = data
         self.header = header
         if read_file:
-            self.read_data()
+            self.read_file()
 
     def __repr__(self):
         return 'MesaData(file_name={0}, data={1}, header={2})'.format(
@@ -57,14 +59,16 @@ class MesaData:
                 )
     
     def __getattr__(self, attr):
-        if attr in self.data.columns:
+        if isinstance(self.data, (dict, DataFrame)) and \
+            attr in self.data.keys():
             return self.data[attr]
-        elif attr in self.header:  # THIS IS NOT IDEAL: REVISE
+        if isinstance(self.header, (dict, DataFrame)) and \
+            attr in self.header.keys():
             return self.header[attr]
         else:
             raise AttributeError(attr)
 
-    def read_data(self):
+    def read_file(self):
         """Loads or updates track data into a series of pandas DataFrame 
         objects.
 
@@ -90,52 +94,17 @@ class TrackData(MesaData):
         The main data from the MESA history track.
     header : pandas.DataFrame
         The header data from the MESA history track.
-    initial_mass : float
-        The initial mass of the stellar track.
-    initial_z : float
-        The initial metallicity of the stellar track
     """
 
-    # def __init__(self, file_name='LOGS/history.data', read_file=True,
-    #              data=None, header=None, initial_mass=None, initial_z=None):
-
-    #     MesaData.__init__(self, file_name=file_name, read_file=read_file,
-    #                       data=data, header=header)
-    #     self.set_initial_conditions(initial_mass=initial_mass,
-    #                                 initial_z=initial_z)
-
     def __repr__(self):
-        return ('TrackData(file_name={0}, data={1}, header={2}, '.format(
-                self.file_name, self.data, self.header) +
-                'initial_mass={0}, initial_z={1}'.format(
-                self.initial_mass, self.initial_z))
+        return 'TrackData(file_name={0}, data={1}, header={2})'.format(
+                self.file_name, self.data, self.header)
 
     def __str__(self):
         return ('A member of TrackData with attributes,\n\n' +
                 'file_name:\n"{}"\n\n'.format(self.file_name) +
                 'data:\n{}\n\n'.format(self.data) +
-                'header:\n{}'.format(self.header) +
-                'initial_mass:\n{}'.format(self.initial_mass) +
-                'initial_z:\n{}'.format(self.initial_z)
-                )
-    
-    # def set_initial_conditions(self, initial_mass=None, initial_z=None):
-    #     """Sets initial conditions of the stellar track to what is
-    #     provided in the header data (default) unless
-    #     provided explicitly in the keyword arguements.
-
-    #     Attributes
-    #     ----------
-    #     initial_mass : float, optional
-    #         Initial mass of the evolutionary track if not available in
-    #         TrackData.header.
-    #     initial_z : float, optional    
-    #         Initial metallicity of the evolutionary track if not available in
-    #         TrackData.header.
-    #     """
-    #     self.initial_mass = initial_mass if initial_mass else \
-    #         self.header.initial_mass[0]
-    #     self.initial_z = initial_z if initial_z else self.header.initial_z[0]
+                'header:\n{}'.format(self.header))
 
     def crop_rc(self, center_he4_upper=0.95, center_he4_lower=1e-4,
                 center_c12_lower=0.05):
@@ -178,6 +147,15 @@ class TrackData(MesaData):
         
         return cropped_track
 
+    def plot(self, x='effective_T', y='luminosity', invert_x=True):
+        fig, ax = plt.subplots()
+        ax.loglog(self.data[x], self.data[y])
+        if invert_x:
+            ax.invert_xaxis()
+        plt.xlabel(x)
+        plt.ylabel(y)
+        fig.show()
+
 
 class ProfileData(MesaData):
     """Structure containing DataFrames from a MESA profile output file. TBC...
@@ -194,21 +172,78 @@ class ProfileData(MesaData):
                 )
 
 
+class ProfileIndex(MesaData):
+    """Reads the MESA profile index file.
+    """
 
-class MesaLogs:
+    index_column_names = ['model_number', 'priority', 'profile_number']
+    index_row_start = 1
+
+    @classmethod
+    def set_index_column_names(cls, names):
+        cls.index_column_names = names
+
+    @classmethod
+    def set_index_row_start(cls, row):
+        cls.index_row_start = row
+    
+    def read_file(self):
+        self.header =  'test header - TBC'  # Soon will read header line
+        self.data = read_csv(self.file_name, delim_whitespace=True,
+                             names=ProfileIndex.index_column_names,
+                             skiprows=ProfileIndex.index_row_start)
+
+
+class MesaLog:
     """Reads the MESA LOGS directory and creates instances of TrackData and 
     ProfileData where appropriate.
     """
 
-    def __init__(self, logs_path='LOGS'):
-        self.logs_path = logs_path
+    def __init__(self, log_path='LOGS',
+                 profile_index_file='profiles.index',
+                 profile_prefix='profile', profile_suffix='data',
+                 history_file='history.data', read_track=False,
+                 read_all_profiles=False):
+        self.log_path = log_path
+        self.profile_index_file = '/'.join((self.log_path, profile_index_file))
+        self.profile_prefix = '/'.join((self.log_path, profile_prefix))
+        self.profile_suffix = profile_suffix
+        self.history_file = '/'.join((self.log_path, history_file))
+
+        self.track = None
+        self.profile_index = None
+        self.profile = dict()
+
+        self.read_log_dir(read_track=read_track,
+                          read_all_profiles=read_all_profiles)
+    
+    def read_log_dir(self, read_track=False, read_all_profiles=False):
+        """Reads the LOGS directory.
+        """
+        self.track = TrackData(self.history_file, read_file=read_track)
+        self.profile_index = ProfileIndex(self.profile_index_file)
+        
+        for i, m in enumerate(
+            self.profile_index.data[ProfileIndex.index_column_names[0]]):
+            # For each model number
+            self.profile[str(m)] = ProfileData(
+                file_name='{0}{1}.{2}'.format(self.profile_prefix, i+1,
+                                               self.profile_suffix),
+                read_file=read_all_profiles)
+    
+    def read_track(self):
+        self.track.read_file()
+    
+    def read_profile(self, model_number):
+        self.profile[str(model_number)].read_file()
 
 
 class MesaGrid:
     """Creates a grid of track data from a given directory path or specified
     list of file paths. Methods to access tracks with a given initial condition
     MesaGrid.search_grid() and sort the grid by mass/metallicity etc. will
-    be added.
+    be added. To be compatible with another element of this MESA companion
+    which allows for the running of grids.
     """
 
     def __init__(self, grid_path=None):
