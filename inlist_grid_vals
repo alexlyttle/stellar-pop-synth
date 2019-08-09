@@ -1,0 +1,11 @@
+&star_job
+/
+&controls
+	star_history_name = 'm.1.00.z.0.01700.y.0.27400/m.1.00.z.0.01700.y.0.27400.track'
+	profiles_index_name = 'm.1.00.z.0.01700.y.0.27400/m.1.00.z.0.01700.y.0.27400.index'
+	profile_data_prefix = 'm.1.00.z.0.01700.y.0.27400/m.1.00.z.0.01700.y.0.27400_n'
+	initial_mass = 1.0
+	initial_z = 0.017
+	Zbase = 0.017
+	initial_y = 0.274
+/
