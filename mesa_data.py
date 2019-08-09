@@ -8,6 +8,7 @@
 # py_mesa_reader, written by by Bill Wolf.
 
 import os, sys
+import numpy as np
 from pandas import DataFrame, read_csv
 from matplotlib import pyplot as plt
 
@@ -544,5 +545,28 @@ class MesaGrid:
 
     """
 
-    def __init__(self, grid_path=None):
-        self.grid_path = grid_path
+    def __init__(self, initial_mass_list, initial_z_list, initial_y_list=None, 
+                 other_controls_list=None, other_controls_names=None,
+                 path_to_grid='LOGS'):
+        self.initial_mass_list = initial_mass_list  # iterable
+        self.initial_z_list = initial_z_list  # iterable
+        self.initial_y_list = initial_y_list  # iterable or None
+        self.other_controls_list = other_controls_list  # dict of iterables
+        self.other_controls_names = other_controls_names  # dict
+        self.path_to_gid = path_to_grid  # str
+
+        # Create the grid and a whole bunch of Track objects
+        grid_shape = []
+        # Change below so that it only creates a grid for values that change
+        grid_shape = [len(self.initial_mass_list), len(self.initial_z_list)]
+        if initial_y_list:
+            grid_shape.append(len(initial_y_list))
+        if other_controls_list:
+            for i in other_controls_list.values():
+                grid_shape.append(len(i))
+        
+        self.grid_tracks = np.ndarray(grid_shape)
+
+
+    def get_track(self, grid_axis, grid_value):
+        return None
