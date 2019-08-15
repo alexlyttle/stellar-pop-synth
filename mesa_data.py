@@ -9,6 +9,7 @@
 
 import os, sys
 import numpy as np
+import xarray as xr
 from pandas import DataFrame, read_csv
 from matplotlib import pyplot as plt
 
@@ -555,17 +556,38 @@ class MesaGrid:
         self.other_controls_names = other_controls_names  # dict
         self.path_to_gid = path_to_grid  # str
 
-        # Create the grid and a whole bunch of Track objects
-        grid_shape = []
-        # Change below so that it only creates a grid for values that change
-        grid_shape = [len(self.initial_mass_list), len(self.initial_z_list)]
+        self.controls_list = {'initial_mass': self.initial_mass_list,
+        'initial_z': self.initial_z_list}
         if initial_y_list:
-            grid_shape.append(len(initial_y_list))
-        if other_controls_list:
-            for i in other_controls_list.values():
-                grid_shape.append(len(i))
+            self.controls_list['initial_y'] = initial_y_list
+        if self.other_controls_list:
+            self.controls_list.update(other_controls_list)
         
-        self.grid_tracks = np.ndarray(grid_shape)
+        # # Create the grid and a whole bunch of Track objects
+        # grid_shape = []
+        # # Change below so that it only creates a grid for values that change
+        # grid_shape = [len(self.initial_mass_list), len(self.initial_z_list)]
+        # if initial_y_list:
+        #     grid_shape.append(len(initial_y_list))
+        # if other_controls_list:
+        #     for i in other_controls_list.values():
+        #         grid_shape.append(len(i))
+        #
+        # self.grid_tracks = np.ndarray(grid_shape)
+
+        # Alternatively - must be shorter way? Using xarray!
+        grid_shape = [len(i) for i in self.controls_list.values()]
+        self.grid_tracks = xr.DataArray(np.ndarray(grid_shape, dtype=Track),
+                                        coords=self.controls_list,
+                                        dims=self.controls_list.keys())
+        n_controls = len(self.controls_list)
+        controls_list_values = [i for i in self.controls_list.values()]
+        n = 0
+        c = np.array(np.meshgrid(*controls_list_values))
+        # now you can iterate through c to create a track at each coord.
+        for i in range(np.size(c, axis=1)):
+            self.grid_tracks.sel()  # make so to select a dict with values
+
 
 
     def get_track(self, grid_axis, grid_value):
