@@ -586,6 +586,7 @@ class MesaGrid:
         c = np.array(np.meshgrid(*controls_list_values))
         # now you can iterate through c to create a track at each coord.
         for i in range(np.size(c, axis=1)):
+            
             self.grid_tracks.sel()  # make so to select a dict with values
 
 
