@@ -462,7 +462,12 @@ class Track:
                 except KeyError:
                     # If no precision for such key, just quotes directly.
                     # note this might fail if there is a key error for 'i'.
-                    name.append(str(self.controls[i]))
+                    # so another try except catches this - IMPROVE CATCH EARLY
+                    try:
+                        name.append(str(self.controls[i]))
+                    except KeyError:
+                        print('Control abbreviations key could not be found ' +
+                              'in controls - not added to name.')
 
         elif self.controls:
             # Else name Track using full list of controls - ADD WARNING here
