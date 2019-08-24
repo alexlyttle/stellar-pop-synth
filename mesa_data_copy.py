@@ -352,7 +352,8 @@ class Track:
 
     def __init__(self, name=None, controls=None, controls_abbreviations=None,
                  name_precisions=dict(), filenaming_method='mesa',
-                #  log_path=None, history_file=None, profile_index_file=None,
+                 log_path='LOGS',
+                #  history_file=None, profile_index_file=None,
                 #  profile_prefix=None, profile_suffix=None,
                  calculate_initial_y=False, dydz=2.0, primordial_y=0.24,
                  initial_y_precision=5,
@@ -368,8 +369,14 @@ class Track:
             # reset the name?
             self.set_initial_y(dydz, primordial_y, precision=initial_y_precision)
         
-        self.reset_name(new_name=name)  # may be useful to specify each
+        self.reset_name(new_name=name) 
         
+        self.log_path = log_path
+        # maybe useful to define other filenames in kwargs?
+        self.history_file = None
+        self.profile_index_file = None
+        self.profile_prefix = None
+        self.profile_suffix = None
         self.reset_filenames(method=filenaming_method)
 
         self.track_data = track_data
