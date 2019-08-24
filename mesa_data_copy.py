@@ -302,87 +302,6 @@ class ProfileIndex(MesaData):
                              skiprows=ProfileIndex.index_row_start)
 
 
-class MesaLog:
-    """
-    Reads the MESA LOGS directory and creates instances of TrackData,
-    ProfileIndex and ProfileData where appropriate.
-
-    Parameters
-    ----------
-    log_path : str, optional
-        Path to the MESA LOGS directory (default is 'LOGS').
-    history_file : str, optional
-        Filename of the MESA track history file (default is 'history.data').
-    profile_index_file : str, optional
-        Filename of the MESA profile index file (default is 'profiles.index').
-    profile_prefix : str, optional
-        Prefix for the MESA profile files, not including the profile number
-        (default is 'profile').
-    profile_suffix : str, optional
-        Suffix for the MESA profile files, also known as the file extension
-        (default is 'data').
-    read_track : bool, optional
-        Option to automatically read the track data from the history file
-        (default is None).
-    read_all_profiles : bool, optional
-        Option to automatically read all profile data in the directory, may
-        take some time (default is None).
-
-    Attributes
-    ----------
-    log_path : str
-        Where the path to the MESA log directory is stored.
-    history_file : str
-        Where the filename of the MESA track history file is stored.
-    profile_index_file : str
-        Where the filename of the MESA profile index file is stored.
-    profile_prefix : str
-        Where the prefix for the MESA profile files is stored.
-    profile_suffix : str
-        Where the s uffix for the MESA profile files (or file extension) is 
-        stored.
-    """
-
-    def __init__(self, log_path='LOGS', history_file='history.data',
-                 profile_index_file='profiles.index',
-                 profile_prefix='profile', profile_suffix='data',
-                 read_track=None, read_all_profiles=None):
-        self.log_path = log_path
-        self.profile_index_file = '/'.join((self.log_path, profile_index_file))
-        self.profile_prefix = '/'.join((self.log_path, profile_prefix))
-        self.profile_suffix = profile_suffix
-        self.history_file = '/'.join((self.log_path, history_file))
-
-        self.track = None
-        self.profile_index = None
-        self.profile = dict()
-
-        self.read_log_dir(read_track=read_track,
-                          read_all_profiles=read_all_profiles)
-    
-    def read_log_dir(self, read_track=False, read_all_profiles=False):
-        """Reads the LOGS directory.
-        """
-        self.track = TrackData(self.history_file, read_file=read_track)
-        self.profile_index = ProfileIndex(self.profile_index_file)
-        
-        for i, m in enumerate(
-            self.profile_index.data[ProfileIndex.index_column_names[0]]):
-            # For each model number
-            self.profile[str(m)] = ProfileData(
-                file_name='{0}{1}.{2}'.format(self.profile_prefix, i+1,
-                                               self.profile_suffix),
-                read_file=read_all_profiles)
-    
-    def read_track(self):
-        self.track.read_file()
-    
-    def read_profile(self, model_number):
-        self.profile[str(model_number)].read_file()
-
-
-# MAKE MORE GENERAL, DO WITHOUT SEPARATE CONTROLS FOR MASS AND Z AND PUT IN
-# ONE DICT
 class Track:
     """
     Stores information about a MESA track. initial_conditions is a dict
@@ -424,24 +343,87 @@ class Track:
         The precisions at which the controls quoted in the name of the Track
         are to be given too. Default is an empty dict,
         precision is automatic based on what is entered as the control.
+    filenaming_method : str, optional
+            Rather than specifying filename controls, one can automatically 
+            set them via a method. 'mesa' uses MESA's default namescheme.
+            'grid' uses the Track name to generate identifiable filenames.
+            Default behaviour is 'mesa'. Set to None if manually providing
     """
 
     def __init__(self, name=None, controls=None, controls_abbreviations=None,
+                 name_precisions=dict(), filenaming_method='mesa',
+                #  log_path=None, history_file=None, profile_index_file=None,
+                #  profile_prefix=None, profile_suffix=None,
                  calculate_initial_y=False, dydz=2.0, primordial_y=0.24,
-                 initial_y_precision=5, name_precisions=dict()):
+                 initial_y_precision=5,
+                 track_data=None, profile_index=None, profile=dict()):
 
         self.controls = controls
         self.controls_abbreviations = controls_abbreviations
         self.name_precisions = name_precisions
+
         if calculate_initial_y:
+            # May want to take this out of the initialisation and have the 
+            # user run the set_initial_y() function which will automatically
+            # reset the name?
             self.set_initial_y(dydz, primordial_y, precision=initial_y_precision)
         
-        if name:
-            self.name = name
-        else:
-            self.reset_name()
+        self.reset_name(new_name=name)  # may be useful to specify each
         
-    def reset_name(self):
+        self.reset_filenames(method=filenaming_method)
+
+        self.track_data = track_data
+        self.profile_index = profile_index
+        self.profile = profile
+
+    def reset_filenames(
+            self, method='mesa', log_path=None, history_file=None,
+            profile_index_file=None, profile_prefix=None, profile_suffix=None
+            ):
+        if method is 'mesa':
+            fns = ['LOGS', 'history.data', 'profiles.index', 'profile', 'data']
+        elif method is 'grid':
+            fns = [
+                '/'.join([self.log_path, self.name]),
+                '.'.join([self.name, 'track']), '.'.join([self.name, 'index']),
+                '_'.join([self.name, 'n']), 'profile'
+                ]
+        elif not method:
+            fns = [
+                log_path, history_file, profile_index_file, profile_prefix,
+                profile_suffix
+                ]
+        
+        self.log_path, self.history_file, self.profile_index_file, \
+            self.profile_prefix, self.profile_suffix = fns
+
+    def read_log_dir(self, read_track=False, read_all_profiles=False):
+        """Reads the LOGS directory.
+        """
+        self.track_data = TrackData(
+            file_name='/'.join([self.log_path, self.history_file]),
+            read_file=read_track
+            )
+        self.profile_index = ProfileIndex(
+            file_name='/'.join([self.log_path, self.profile_index_file])
+            )
+        
+        for i, m in enumerate(
+            self.profile_index.data[ProfileIndex.index_column_names[0]]):
+            # For each model number
+            self.profile[str(m)] = ProfileData(
+                file_name='{0}/{1}{2}.{3}'.format(self.log_path,
+                                                  self.profile_prefix, i+1,
+                                                  self.profile_suffix),
+                read_file=read_all_profiles)
+    
+    def read_track(self):
+        self.track_data.read_file()
+    
+    def read_profile(self, model_number):
+        self.profile[str(model_number)].read_file()        
+                
+    def reset_name(self, new_name=None):
         """
         Sets the name of the track according to the following convension:
         control_abbreviation.<control_value> (repeats for each control)
@@ -465,9 +447,10 @@ class Track:
                     # so another try except catches this - IMPROVE CATCH EARLY
                     try:
                         name.append(str(self.controls[i]))
-                    except KeyError:
-                        print('Control abbreviations key could not be found ' +
-                              'in controls - not added to name.')
+                    except KeyError as kerr:
+                        print("Control abbreviations key '{0}' ".format(kerr) +
+                              "could not be found in controls " +
+                              "- abbreviation not added to name.")
 
         elif self.controls:
             # Else name Track using full list of controls - ADD WARNING here
@@ -478,6 +461,8 @@ class Track:
                     name.append('{0:.{1}f}'.format(j, self.name_precisions[i]))
                 except KeyError:
                     name.append(str(j))
+        elif new_name:
+            name.append(new_name)
         else:
             name.append('untitled_track')
         
@@ -502,6 +487,7 @@ class Track:
             Number of decimal places to round initial_y calculation, default is
             5.
         """
+        # HAVE THIS RESET THE NAME OF THE TRACK TO ACCOUNT FOR THIS
         try:
             self.controls['initial_y'] = round(
                 primordial_y + dydz*self.controls['initial_z'], precision
@@ -517,18 +503,19 @@ class Track:
         """
         f = open('inlist_grid_vals', 'w')
         
-        # Star Job -  currently empty
+        # Star Job -  currently empty as not added this functionality
         f.write('&star_job\n')
         f.write('/\n')
         
         # Controls
         f.write('&controls\n')
 
-        # Filenames currently done for use with a grid (hence extra path).
-        f.write("\tstar_history_name = '%s.track'\n" %(self.name+'/'+self.name))
-        f.write("\tprofiles_index_name = '%s.index'\n" %(self.name+'/'+self.name))
-        f.write("\tprofile_data_prefix = '%s_n'\n" %(self.name+'/'+self.name))
-    
+        # Make the following optional in case such details are in another inlist
+        f.write("\tlog_directory = '{0}'\n".format(self.log_path))
+        f.write("\tstar_history_name = '{0}'\n".format(self.history_file))
+        f.write("\tprofiles_index_name = '{0}'\n".format(self.profile_index_file))
+        f.write("\tprofile_data_prefix = '{0}'\n".format(self.profile_prefix))
+        f.write("\tprofile_data_suffix = '{0}'\n".format(self.profile_suffix))
         if self.controls:
             for i, j in self.controls.items():
                 # For each other control, write its value on a new line.
@@ -537,7 +524,7 @@ class Track:
         f.write('/\n')
         f.close()
 
-    def run(self, log_console_output=True):
+    def run(self, path='', log_console_output=True):
         """
         Runs MESA for the given track.
 
@@ -547,16 +534,16 @@ class Track:
             If True (default) the console output is logged in the MESA LOGS
             directory under <self.name>.out.
         """
-        os.system('mkdir -p LOGS/'+self.name)
+        # os.system('mkdir -p LOGS/'+self.name)
         self.write_inlist()
         
         if log_console_output:
             # Put console output into separate file
-            os.system('./rn > LOGS/'+self.name+'.out')
+            os.system('.'+path+'/rn > LOGS/'+self.name+'.out')
         else:
-            os.system('./rn')
+            os.system('.'+path+'/rn')
         os.system('echo '+self.name+' >> track_finished')
-        
+
 
 class MesaGrid:
     """
@@ -573,7 +560,7 @@ class MesaGrid:
     INITIAL_Z, OR OVERSHOOTING CONTROLS WHICH COUPLE)
     """
 
-    def __init__(self, controls=None, controls_abbreviations=None,
+    def __init__(self, controls=dict(), controls_abbreviations=dict(),
                  path_to_grid='LOGS'):
         # Need to add parameters for every attribute so it is possible to
         # recreate from itself.
@@ -584,15 +571,14 @@ class MesaGrid:
         self.controls_abbreviations = controls_abbreviations  # dict
         self.path_to_gid = path_to_grid  # str
 
-        if self.controls:
-            self.controls_names = [key for key in self.controls.keys()]
-                # Note that these are the controls names not the file ref names
-            self.controls_list = [val for val in self.controls.values()]
-            self.create_tracks()  # Will define grid tracks from controls
-        else:
-            self.controls_names = None
-            self.controls_list = None
-            self.grid_tracks = None
+        self.controls_names = [key for key in self.controls.keys()]
+            # Note that these are the controls names not the file ref names
+        self.controls_list = [val for val in self.controls.values()]
+        self.create_tracks()  # Will define grid tracks from controls
+
+        # An array of all combinations of controls list
+        self.coords = np.meshgrid(*self.controls_list)  # grid of coord combinations
+        self.coords = np.array([i.flatten() for i in self.coords])  # flatten each coord
 
     def create_tracks(self):
         grid_shape = [np.size(i) for i in self.controls_list]
@@ -600,15 +586,18 @@ class MesaGrid:
                                         coords=self.controls_list,
                                         dims=self.controls_names)
 
-        coords = np.meshgrid(*self.controls_list)  # grid of coord combinations
-        coords = np.array([i.flatten() for i in coords])  # flatten each coord
-
-        for i in range(np.size(coords, axis=1)):
+        for i in range(np.size(self.coords, axis=1)):
             # For each combination of controls, create a track
-            track_controls = dict(zip(self.controls_names, coords[:, i]))
+            track_controls = dict(zip(self.controls_names, self.coords[:, i]))
             self.grid_tracks.loc[track_controls] = \
                 Track(controls=track_controls,
-                      controls_abbreviations=self.controls_abbreviations)
+                      controls_abbreviations=self.controls_abbreviations,
+                      filenaming_method='grid')
 
-    def get_track(self, grid_axis, grid_value):
-        return None
+    def read_logs(self, args, kwargs):
+        for i in range(np.size(self.coords, axis=1)):
+            # For each combination of controls, read logs
+            track_controls = dict(zip(self.controls_names, self.coords[:, i]))
+            self.grid_tracks.loc[track_controls].read_log_dir(read_track=True) # need args!!!
+
+    # def interpolate(self, coords, track_columns, method='linear')
