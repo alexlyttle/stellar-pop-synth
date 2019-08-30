@@ -404,32 +404,6 @@ class Track:
         self.log_path, self.history_file, self.profile_index_file, \
             self.profile_prefix, self.profile_suffix = fns
 
-    def read_log_dir(self, read_track=False, read_all_profiles=False):
-        """Reads the LOGS directory.
-        """
-        self.track_data = TrackData(
-            file_name='/'.join([self.log_path, self.history_file]),
-            read_file=read_track
-            )
-        self.profile_index = ProfileIndex(
-            file_name='/'.join([self.log_path, self.profile_index_file])
-            )
-        
-        for i, m in enumerate(
-            self.profile_index.data[ProfileIndex.index_column_names[0]]):
-            # For each model number
-            self.profile[str(m)] = ProfileData(
-                file_name='{0}/{1}{2}.{3}'.format(self.log_path,
-                                                  self.profile_prefix, i+1,
-                                                  self.profile_suffix),
-                read_file=read_all_profiles)
-    
-    def read_track(self):
-        self.track_data.read_file()
-    
-    def read_profile(self, model_number):
-        self.profile[str(model_number)].read_file()        
-                
     def reset_name(self, new_name=None):
         """
         Sets the name of the track according to the following convension:
@@ -503,6 +477,32 @@ class Track:
             print('Cannot set initial_y without initial_z. Please add a ' +
                 'value for "initial_z" in the Track.controls.')
     
+    def read_log_dir(self, read_track=False, read_all_profiles=False):
+        """Reads the LOGS directory.
+        """
+        self.track_data = TrackData(
+            file_name='/'.join([self.log_path, self.history_file]),
+            read_file=read_track
+            )
+        self.profile_index = ProfileIndex(
+            file_name='/'.join([self.log_path, self.profile_index_file])
+            )
+        
+        for i, m in enumerate(
+            self.profile_index.data[ProfileIndex.index_column_names[0]]):
+            # For each model number
+            self.profile[str(m)] = ProfileData(
+                file_name='{0}/{1}{2}.{3}'.format(self.log_path,
+                                                  self.profile_prefix, i+1,
+                                                  self.profile_suffix),
+                read_file=read_all_profiles)
+    
+    def read_track(self):
+        self.track_data.read_file()
+    
+    def read_profile(self, model_number):
+        self.profile[str(model_number)].read_file()        
+                   
     def write_inlist(self):
         """
         Writes the specified conditions of the track to the file
@@ -576,35 +576,35 @@ class MesaGrid:
             # Crudely turns each item into a list
             self.controls[i] = [j] if not isinstance(j, (list, tuple)) else j
         self.controls_abbreviations = controls_abbreviations  # dict
-        self.path_to_gid = path_to_grid  # str
+        self.path_to_grid = path_to_grid  # str
 
         self.controls_names = [key for key in self.controls.keys()]
             # Note that these are the controls names not the file ref names
         self.controls_list = [val for val in self.controls.values()]
-        self.create_tracks()  # Will define grid tracks from controls
-
         # An array of all combinations of controls list
         self.coords = np.meshgrid(*self.controls_list)  # grid of coord combinations
         self.coords = np.array([i.flatten() for i in self.coords])  # flatten each coord
 
+        self.create_tracks()  # Will define grid tracks from controls
+
     def create_tracks(self):
         grid_shape = [np.size(i) for i in self.controls_list]
-        self.grid_tracks = xr.DataArray(np.ndarray(grid_shape, dtype=Track),
+        self.tracks = xr.DataArray(np.ndarray(grid_shape, dtype=Track),
                                         coords=self.controls_list,
                                         dims=self.controls_names)
 
         for i in range(np.size(self.coords, axis=1)):
             # For each combination of controls, create a track
             track_controls = dict(zip(self.controls_names, self.coords[:, i]))
-            self.grid_tracks.loc[track_controls] = \
+            self.tracks.loc[track_controls] = \
                 Track(controls=track_controls,
                       controls_abbreviations=self.controls_abbreviations,
                       filenaming_method='grid')
 
-    def read_logs(self, args, kwargs):
+    def read_logs(self):
         for i in range(np.size(self.coords, axis=1)):
             # For each combination of controls, read logs
             track_controls = dict(zip(self.controls_names, self.coords[:, i]))
-            self.grid_tracks.loc[track_controls].read_log_dir(read_track=True) # need args!!!
+            self.tracks.loc[track_controls].read_log_dir(read_track=True) # need args!!!
 
     # def interpolate(self, coords, track_columns, method='linear')
