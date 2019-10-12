@@ -604,10 +604,9 @@ class MesaGrid:
         # axis 0 = each dimension
         # axis 1 = need to flatten along this
         # now you can iterate through c to create a track at each coord.
-        for i in range(np.size(c, axis=1)):
-            # This may be quite slow, better to index with 
-            self.grid_tracks.sel(dict(zip(self.controls_names, c[:, i]))) = \
-                Track(c[0, i], c[1, i], initial_y=)
+        # for i in range(np.size(c, axis=1)):
+        #     # This may be quite slow, better to index with 
+        #     self.grid_tracks.sel(dict(zip(self.controls_names, c[:, i]))) = Track(c[0, i], c[1, i], initial_y=None)
 
 
 
